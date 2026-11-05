@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dirichlet Simplex Lab</title>
+<style>
+:root{
+  color-scheme: light;
+  --bg:#f6f4ef; --panel:#ffffff; --ink:#1d1d1f; --muted:#66666c; --line:#dcd8cf;
+  --c1:#d1495b; --c2:#2e86ab; --c3:#d99a00;
+  --accent:#3b5bdb; --on-accent:#ffffff;
+  --heat-lo:#fbf8f1; --heat-hi:#3d2c8d;
+  --f-mono:"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --bg:#121316; --panel:#1b1d22; --ink:#ececf0; --muted:#9a9ba3; --line:#34363d;
+    --c1:#ff6b7a; --c2:#5bb4e0; --c3:#f2c14e;
+    --accent:#7c93ff; --on-accent:#0e1020;
+    --heat-lo:#1b1d22; --heat-hi:#c9b8ff;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --bg:#121316; --panel:#1b1d22; --ink:#ececf0; --muted:#9a9ba3; --line:#34363d;
+  --c1:#ff6b7a; --c2:#5bb4e0; --c3:#f2c14e;
+  --accent:#7c93ff; --on-accent:#0e1020;
+  --heat-lo:#1b1d22; --heat-hi:#c9b8ff;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:1100px;margin:0 auto;padding:20px 16px 32px}
+header{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 16px}
+h1{font-size:22px;margin:0;letter-spacing:-.01em}
+.formula{font:13px var(--f-mono);color:var(--muted)}
+.lede{color:var(--muted);max-width:72ch;margin:8px 0 18px}
+.grid{display:grid;grid-template-columns:1fr;gap:16px}
+@media (min-width:760px){.grid{grid-template-columns:minmax(0,1.2fr) minmax(0,1fr)}}
+.stage{position:relative;align-self:start;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px}
+#plot{display:block;width:100%;aspect-ratio:1/0.95;cursor:crosshair;touch-action:none}
+.hover{position:absolute;top:12px;left:14px;font:12px/1.4 var(--f-mono);color:var(--muted);pointer-events:none}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--muted);padding:6px 4px 2px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+.rack{display:flex;flex-direction:column;gap:12px;min-width:0}
+.rack section{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.label{margin:0 0 8px;font-size:11px;font-weight:600;letter-spacing:.02em;color:var(--muted)}
+.sl{display:grid;grid-template-columns:28px minmax(0,1fr) 76px;align-items:center;gap:10px;margin:4px 0}
+.sl .nm{font-family:var(--f-mono);font-weight:600}
+.sl input[type=range]{width:100%;accent-color:var(--k)}
+input[type=number]{width:100%;font:13px var(--f-mono);padding:4px 6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
+.chip-row{display:flex;flex-wrap:wrap;gap:6px}
+.chip-row button{font-size:12px;border-radius:999px;padding:4px 10px}
+.row{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;font-size:13px}
+button{font:inherit;font-size:13px;padding:6px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer}
+button:hover{border-color:var(--muted)}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent);min-width:70px}
+.count{margin-left:auto;font-family:var(--f-mono);color:var(--muted)}
+label{display:inline-flex;align-items:center;gap:5px;color:var(--muted)}
+input[type=checkbox],#speed{accent-color:var(--accent)}
+.tbl{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font:12.5px var(--f-mono)}
+th,td{padding:5px 6px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-weight:600;color:var(--muted)}
+th:first-child,td:first-child{text-align:left;font-weight:600}
+tbody tr:last-child td{border-bottom:0;color:var(--muted);white-space:normal}
+.marg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.marg figure{margin:0}
+.marg canvas{display:block;width:100%;height:70px;border-bottom:1px solid var(--line)}
+figcaption{font:10.5px var(--f-mono);color:var(--muted);margin-top:4px;text-align:center}
+.note{font-size:12px;color:var(--muted);margin:0 2px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>Dirichlet Simplex Lab</h1>
+  <span class="formula">x ~ Dir(α₁, α₂, α₃) &nbsp;·&nbsp; x₁ + x₂ + x₃ = 1</span>
+</header>
+<p class="lede">Each draw is a point on the 2-simplex: three non‑negative proportions that sum to one. Move the α sliders and watch the samples and the density reshape. Small α pushes mass to the corners and edges; large α concentrates it near the mean.</p>
+<div class="grid">
+  <div class="stage">
+    <canvas id="plot" aria-label="Ternary plot of Dirichlet samples"></canvas>
+    <div class="hover" id="hover">hover the simplex</div>
+    <div class="legend">
+      <span><i style="background:var(--c1)"></i>x₁ vertex (top)</span>
+      <span><i style="background:var(--c2)"></i>x₂ (left)</span>
+      <span><i style="background:var(--c3)"></i>x₃ (right)</span>
+      <span>◆ mean &nbsp; ✕ mode</span>
+    </div>
+  </div>
+  <div class="rack">
+    <section>
+      <p class="label">Concentration α</p>
+      <div class="sliders" id="sliders"></div>
+    </section>
+    <section>
+      <p class="label">Presets</p>
+      <div class="chip-row" id="presets"></div>
+    </section>
+    <section>
+      <p class="label">Sampling</p>
+      <div class="row">
+        <button class="primary" id="run">Pause</button>
+        <button id="burst">+1,000</button>
+        <button id="clear">Clear</button>
+        <span class="count" id="count">n = 0</span>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <label><input type="checkbox" id="showDens" checked> density</label>
+        <label><input type="checkbox" id="showPts" checked> samples</label>
+        <label><input type="checkbox" id="showGrid" checked> grid</label>
+        <label>speed <input type="range" id="speed" min="1" max="200" value="40" style="width:90px"></label>
+      </div>
+    </section>
+    <section>
+      <p class="label">Moments: theory vs sample</p>
+      <div class="tbl">
+        <table>
+          <thead><tr><th></th><th>E[x]</th><th>x̄</th><th>Var</th><th>s²</th></tr></thead>
+          <tbody id="stats"></tbody>
+        </table>
+      </div>
+    </section>
+    <section>
+      <p class="label">Marginals xᵢ ~ Beta(αᵢ, α₀ − αᵢ)</p>
+      <div class="marg">
+        <figure><canvas id="m0"></canvas><figcaption id="mc0"></figcaption></figure>
+        <figure><canvas id="m1"></canvas><figcaption id="mc1"></figcaption></figure>
+        <figure><canvas id="m2"></canvas><figcaption id="mc2"></figcaption></figure>
+      </div>
+    </section>
+    <p class="note">Sampling uses the gamma construction: draw yᵢ ~ Gamma(αᵢ, 1) by Marsaglia–Tsang and set xᵢ = yᵢ / Σy. Changing α keeps the plot running with fresh draws; the previous cloud is cleared.</p>
+  </div>
+</div>
+</div>
+
+<script>
+(() => {
+const MAXPTS = 25000;
+let alpha = [2, 5, 3];
+let pts = [];            // flat [x1,x2,x3,...]
+let running = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+const $ = id => document.getElementById(id);
+
+/* ---------- math ---------- */
+function randn(){ let u=0,v=0; while(!u)u=Math.random(); while(!v)v=Math.random();
+  return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v); }
+function gamma(a){
+  if (a < 1){ const u = Math.random(); return gamma(a+1)*Math.pow(u, 1/a); }
+  const d = a - 1/3, c = 1/Math.sqrt(9*d);
+  for(;;){ let x, v; do { x = randn(); v = 1 + c*x; } while (v <= 0);
+    v = v*v*v; const u = Math.random();
+    if (u < 1 - 0.0331*x*x*x*x) return d*v;
+    if (Math.log(u) < 0.5*x*x + d*(1 - v + Math.log(v))) return d*v; }
+}
+function dirichlet(a){
+  const y = a.map(gamma); const s = y[0]+y[1]+y[2];
+  if (!(s > 0)) { // extreme small alpha underflow: put all mass on one vertex
+    const i = Math.floor(Math.random()*3); return [0,1,2].map(k => k===i?1:0); }
+  return y.map(v => v/s);
+}
+const LG = [676.5203681218851,-1259.1392167224028,771.32342877765313,-176.61502916214059,12.507343278686905,-0.13857109526572012,9.9843695780195716e-6,1.5056327351493116e-7];
+function lgamma(z){
+  if (z < 0.5) return Math.log(Math.PI/Math.abs(Math.sin(Math.PI*z))) - lgamma(1-z);
+  z -= 1; let x = 0.99999999999980993;
+  for (let i=0;i<8;i++) x += LG[i]/(z+i+1);
+  const t = z + 7.5;
+  return 0.5*Math.log(2*Math.PI) + (z+0.5)*Math.log(t) - t + Math.log(x);
+}
+function logNorm(a){ return lgamma(a[0]+a[1]+a[2]) - lgamma(a[0]) - lgamma(a[1]) - lgamma(a[2]); }
+function logpdf(x, a, ln){ return ln + (a[0]-1)*Math.log(x[0]) + (a[1]-1)*Math.log(x[1]) + (a[2]-1)*Math.log(x[2]); }
+
+/* ---------- colors ---------- */
+let C = {};
+function readColors(){
+  const s = getComputedStyle(document.documentElement);
+  ['bg','panel','ink','muted','line','c1','c2','c3','accent','heat-lo','heat-hi'].forEach(k => C[k] = s.getPropertyValue('--'+k).trim());
+  C.rgb = {}; for (const k in C) if (typeof C[k]==='string' && C[k][0]==='#') C.rgb[k] = hex(C[k]);
+}
+function hex(h){ h=h.replace('#',''); if(h.length===3)h=h.split('').map(c=>c+c).join('');
+  return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)]; }
+
+/* ---------- geometry ---------- */
+const cv = $('plot'), ctx = cv.getContext('2d');
+let W=0,H=0,dpr=1, V=[];
+const dens = document.createElement('canvas'); let densDirty = true;
+function resize(){
+  dpr = Math.min(window.devicePixelRatio||1, 2);
+  const r = cv.getBoundingClientRect(); W = r.width; H = r.height;
+  if (!W || !H) return;
+  cv.width = Math.round(W*dpr); cv.height = Math.round(H*dpr);
+  const pad = Math.max(52, W*0.1);
+  const side = Math.min(W - 2*pad, (H - 2*pad)/(Math.sqrt(3)/2));
+  const h = side*Math.sqrt(3)/2, cx = W/2, top = (H - h)/2 + 4;
+  V = [[cx, top], [cx - side/2, top + h], [cx + side/2, top + h]];
+  densDirty = true; draw();
+}
+const toXY = x => [x[0]*V[0][0]+x[1]*V[1][0]+x[2]*V[2][0], x[0]*V[0][1]+x[1]*V[1][1]+x[2]*V[2][1]];
+function toBary(px,py){
+  const [a,b,c] = V, det = (b[1]-c[1])*(a[0]-c[0]) + (c[0]-b[0])*(a[1]-c[1]);
+  const l1 = ((b[1]-c[1])*(px-c[0]) + (c[0]-b[0])*(py-c[1]))/det;
+  const l2 = ((c[1]-a[1])*(px-c[0]) + (a[0]-c[0])*(py-c[1]))/det;
+  return [l1, l2, 1-l1-l2];
+}
+
+/* ---------- density layer ---------- */
+function buildDensity(){
+  const R = 260, rw = R, rh = Math.max(1, Math.round(R*H/W));
+  dens.width = rw; dens.height = rh;
+  const d = dens.getContext('2d'), img = d.createImageData(rw, rh);
+  const ln = logNorm(alpha), vals = new Float32Array(rw*rh).fill(NaN), list = [];
+  for (let j=0;j<rh;j++) for (let i=0;i<rw;i++){
+    const x = toBary((i+0.5)*W/rw, (j+0.5)*H/rh);
+    if (x[0]<=0||x[1]<=0||x[2]<=0) continue;
+    const v = logpdf(x, alpha, ln); vals[j*rw+i] = v; list.push(v);
+  }
+  if (!list.length) return;
+  list.sort((p,q)=>p-q);
+  const hi = list[Math.floor(list.length*0.985)], lo = hi - 6; // ~6 nats of dynamic range
+  const L = C.rgb['heat-lo'], Hh = C.rgb['heat-hi'];
+  for (let k=0;k<vals.length;k++){
+    const v = vals[k]; if (isNaN(v)) continue;
+    let t = (Math.min(v,hi) - lo)/(hi-lo); t = Math.max(0,t); t = Math.pow(t, 1.6);
+    img.data[k*4]   = L[0]+(Hh[0]-L[0])*t;
+    img.data[k*4+1] = L[1]+(Hh[1]-L[1])*t;
+    img.data[k*4+2] = L[2]+(Hh[2]-L[2])*t;
+    img.data[k*4+3] = 70 + 160*t;
+  }
+  d.putImageData(img,0,0); densDirty = false;
+}
+
+/* ---------- drawing ---------- */
+function mixColor(x){
+  const a=C.rgb.c1,b=C.rgb.c2,c=C.rgb.c3;
+  return `rgb(${(x[0]*a[0]+x[1]*b[0]+x[2]*c[0])|0},${(x[0]*a[1]+x[1]*b[1]+x[2]*c[1])|0},${(x[0]*a[2]+x[1]*b[2]+x[2]*c[2])|0})`;
+}
+function draw(){
+  if (!V.length) return;
+  ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H);
+  const tri = () => { ctx.beginPath(); ctx.moveTo(...V[0]); ctx.lineTo(...V[1]); ctx.lineTo(...V[2]); ctx.closePath(); };
+  if ($('showDens').checked){
+    if (densDirty) buildDensity();
+    ctx.save(); tri(); ctx.clip(); ctx.imageSmoothingEnabled = true; ctx.drawImage(dens,0,0,W,H); ctx.restore();
+  }
+  if ($('showGrid').checked){
+    ctx.strokeStyle = C.line; ctx.lineWidth = 1;
+    for (let k=1;k<10;k++){ const t=k/10;
+      for (let m=0;m<3;m++){ const a=[0,0,0],b=[0,0,0]; a[m]=t; b[m]=t; a[(m+1)%3]=1-t; b[(m+2)%3]=1-t;
+        ctx.beginPath(); ctx.moveTo(...toXY(a)); ctx.lineTo(...toXY(b)); ctx.globalAlpha=k%5?0.45:0.9; ctx.stroke(); } }
+    ctx.globalAlpha=1;
+  }
+  if ($('showPts').checked && pts.length){
+    const n = pts.length/3, r = n > 8000 ? 1.1 : n > 2000 ? 1.5 : 2.1;
+    ctx.globalAlpha = n > 8000 ? 0.55 : 0.8;
+    for (let k=0;k<pts.length;k+=3){
+      const x=[pts[k],pts[k+1],pts[k+2]], p=toXY(x);
+      ctx.fillStyle = mixColor(x); ctx.fillRect(p[0]-r/2,p[1]-r/2,r,r);
+    }
+    ctx.globalAlpha = 1;
+  }
+  tri(); ctx.strokeStyle = C.ink; ctx.lineWidth = 1.4; ctx.stroke();
+  const lab = [['x₁ = 1',C.c1,0,-12,'center'],['x₂ = 1',C.c2,-6,18,'right'],['x₃ = 1',C.c3,6,18,'left']];
+  ctx.font = `600 12px ${C.mono}`;
+  lab.forEach((l,i)=>{ ctx.fillStyle=l[1]; ctx.textAlign=l[4]; ctx.fillText(l[0], V[i][0]+l[2], V[i][1]+l[3]);
+    ctx.beginPath(); ctx.arc(V[i][0],V[i][1],4,0,7); ctx.fill(); });
+  // mean & mode
+  const a0 = alpha[0]+alpha[1]+alpha[2], mean = alpha.map(a=>a/a0), pm = toXY(mean);
+  ctx.fillStyle = C.ink; ctx.strokeStyle = C.panel; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(pm[0],pm[1]-6); ctx.lineTo(pm[0]+6,pm[1]); ctx.lineTo(pm[0],pm[1]+6); ctx.lineTo(pm[0]-6,pm[1]); ctx.closePath(); ctx.stroke(); ctx.fill();
+  if (alpha.every(a=>a>1)){ const mo = alpha.map(a=>(a-1)/(a0-3)), q = toXY(mo);
+    ctx.strokeStyle = C.ink; ctx.lineWidth = 2; ctx.beginPath();
+    ctx.moveTo(q[0]-5,q[1]-5); ctx.lineTo(q[0]+5,q[1]+5); ctx.moveTo(q[0]+5,q[1]-5); ctx.lineTo(q[0]-5,q[1]+5); ctx.stroke(); }
+}
+
+/* ---------- marginals ---------- */
+function drawMarginals(){
+  const a0 = alpha[0]+alpha[1]+alpha[2], n = pts.length/3, B = 24;
+  for (let i=0;i<3;i++){
+    const c = $('m'+i), g = c.getContext('2d'), r = c.getBoundingClientRect();
+    if (!r.width || !r.height) continue;
+    c.width = Math.round(r.width*dpr); c.height = Math.round(r.height*dpr);
+    g.setTransform(dpr,0,0,dpr,0,0); const w=r.width, h=r.height, pad=4;
+    const a=alpha[i], b=a0-a, ln = lgamma(a0)-lgamma(a)-lgamma(b);
+    const pdf = t => Math.exp(ln + (a-1)*Math.log(t) + (b-1)*Math.log(1-t));
+    const hist = new Array(B).fill(0);
+    for (let k=i;k<pts.length;k+=3) hist[Math.min(B-1,Math.floor(pts[k]*B))]++;
+    const hd = hist.map(v => n ? v/n*B : 0);
+    const curve = []; for (let s=1;s<200;s++){ const t=s/200; curve.push([t,pdf(t)]); }
+    const cs = curve.map(p=>p[1]).filter(isFinite).sort((p,q)=>p-q);
+    const ymax = Math.max(Math.max(...hd)*1.05, cs[Math.floor(cs.length*0.97)]*1.1, 0.5);
+    const col = C['c'+(i+1)];
+    g.fillStyle = col; g.globalAlpha = 0.35;
+    hd.forEach((v,k)=>{ const bh = Math.min(v/ymax,1)*(h-2*pad); g.fillRect(k/B*w+0.5, h-pad-bh, w/B-1, bh); });
+    g.globalAlpha = 1; g.strokeStyle = col; g.lineWidth = 1.6; g.beginPath();
+    curve.forEach((p,k)=>{ const y = h-pad-Math.min(p[1]/ymax,1.05)*(h-2*pad); k? g.lineTo(p[0]*w,y) : g.moveTo(p[0]*w,y); });
+    g.stroke();
+    $('mc'+i).textContent = `x${'₁₂₃'[i]} ~ Beta(${fmt(a)}, ${fmt(b)})`;
+  }
+}
+
+/* ---------- stats ---------- */
+const fmt = v => v >= 100 ? v.toFixed(0) : v >= 10 ? v.toFixed(1) : v.toFixed(2);
+function updateStats(){
+  const a0 = alpha[0]+alpha[1]+alpha[2], n = pts.length/3;
+  const m=[0,0,0], s=[0,0,0];
+  for (let k=0;k<pts.length;k+=3) for (let i=0;i<3;i++) m[i]+=pts[k+i];
+  for (let i=0;i<3;i++) m[i] = n ? m[i]/n : NaN;
+  for (let k=0;k<pts.length;k+=3) for (let i=0;i<3;i++) s[i]+=(pts[k+i]-m[i])**2;
+  const rows = [0,1,2].map(i=>{
+    const E = alpha[i]/a0, Var = alpha[i]*(a0-alpha[i])/(a0*a0*(a0+1));
+    return `<tr><td style="color:var(--c${i+1})">x${'₁₂₃'[i]}</td><td>${E.toFixed(4)}</td><td>${n?m[i].toFixed(4):'—'}</td><td>${Var.toFixed(5)}</td><td>${n>1?(s[i]/(n-1)).toFixed(5):'—'}</td></tr>`;
+  });
+  const shape = alpha.every(a=>a>1) ? 'unimodal interior mode'
+    : alpha.every(a=>a===1) ? 'uniform on simplex'
+    : alpha.some(a=>a<1) ? 'mass pulled toward edges/corners' : 'mode on boundary';
+  rows.push(`<tr><td>α₀</td><td colspan="4" style="text-align:left;padding-left:14px">${fmt(a0)} &nbsp;·&nbsp; ${shape}</td></tr>`);
+  $('stats').innerHTML = rows.join('');
+  $('count').textContent = `n = ${n.toLocaleString()}`;
+}
+
+/* ---------- controls ---------- */
+const toS = a => Math.log10(a);         // slider is log10(α), range 0.05..50
+const fromS = s => +Math.pow(10, s).toPrecision(3);
+const slWrap = $('sliders');
+[0,1,2].forEach(i=>{
+  const d = document.createElement('div'); d.className='sl'; d.style.setProperty('--k', `var(--c${i+1})`);
+  d.innerHTML = `<span class="nm" style="color:var(--c${i+1})">α${'₁₂₃'[i]}</span>
+    <input type="range" id="s${i}" min="${toS(0.05)}" max="${toS(50)}" step="0.005" aria-label="alpha ${i+1}">
+    <input type="number" id="n${i}" min="0.01" max="200" step="0.1" aria-label="alpha ${i+1} value">`;
+  slWrap.appendChild(d);
+  $('s'+i).addEventListener('input', e => setAlpha(i, fromS(+e.target.value), 'slider'));
+  $('n'+i).addEventListener('change', e => { const v = +e.target.value; if (v>0) setAlpha(i, v, 'num'); });
+});
+function syncInputs(){ [0,1,2].forEach(i=>{ $('s'+i).value = toS(Math.min(50,Math.max(0.05,alpha[i]))); $('n'+i).value = alpha[i]; }); }
+function setAlpha(i, v, src){
+  alpha[i] = v; if (src!=='slider') syncInputs(); else $('n'+i).value = v;
+  pts = []; densDirty = true; refresh();
+}
+const presets = [
+  ['Uniform (1,1,1)',[1,1,1]], ['Sparse (0.2,0.2,0.2)',[0.2,0.2,0.2]], ['Peaked (20,20,20)',[20,20,20]],
+  ['Skewed (2,5,15)',[2,5,15]], ['Edge (0.5,5,5)',[0.5,5,5]], ['Corner (8,0.6,0.6)',[8,0.6,0.6]]
+];
+presets.forEach(([name,a])=>{ const b=document.createElement('button'); b.textContent=name;
+  b.onclick=()=>{ alpha=[...a]; syncInputs(); pts=[]; densDirty=true; refresh(); }; $('presets').appendChild(b); });
+
+function addSamples(k){
+  for (let j=0;j<k;j++){ const x = dirichlet(alpha); pts.push(x[0],x[1],x[2]); }
+  if (pts.length > MAXPTS*3) pts.splice(0, pts.length - MAXPTS*3);
+}
+function refresh(){ draw(); updateStats(); drawMarginals(); }
+$('run').onclick = () => { running = !running; $('run').textContent = running ? 'Pause' : 'Run'; if (running) loop(); };
+$('burst').onclick = () => { addSamples(1000); refresh(); };
+$('clear').onclick = () => { pts = []; refresh(); };
+['showDens','showPts','showGrid'].forEach(id => $(id).addEventListener('change', draw));
+
+cv.addEventListener('pointermove', e => {
+  if (!V.length) return;
+  const r = cv.getBoundingClientRect(), x = toBary(e.clientX-r.left, e.clientY-r.top);
+  if (x.some(v=>v<0)) { $('hover').textContent = 'outside simplex'; return; }
+  const p = Math.exp(logpdf(x, alpha, logNorm(alpha)));
+  $('hover').innerHTML = `x = (${x.map(v=>v.toFixed(3)).join(', ')})<br>p(x) = ${p<1e-3||p>1e4?p.toExponential(2):p.toFixed(3)}`;
+});
+cv.addEventListener('pointerleave', () => $('hover').textContent = 'hover the simplex');
+
+let frame = 0;
+function loop(){
+  if (!running) return;
+  addSamples(+$('speed').value);
+  draw(); updateStats();
+  if (++frame % 6 === 0) drawMarginals();
+  requestAnimationFrame(loop);
+}
+
+/* theme + size changes */
+const mo = new MutationObserver(()=>{ readColors(); densDirty = true; refresh(); });
+mo.observe(document.documentElement, {attributes:true, attributeFilter:['data-theme']});
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', ()=>{ readColors(); densDirty=true; refresh(); });
+window.addEventListener('resize', () => { resize(); drawMarginals(); });
+
+readColors();
+C.mono = getComputedStyle(document.documentElement).getPropertyValue('--f-mono').trim() || 'monospace';
+syncInputs(); resize();
+addSamples(1500); refresh();
+$('run').textContent = running ? 'Pause' : 'Run';
+if (running) loop();
+})();
+</script>
+</body>
+</html>
